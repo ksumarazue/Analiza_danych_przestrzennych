@@ -1,0 +1,27 @@
+#  Pyharm settings
+.idea/
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local environment variables
+.env
+.env.*
+!.env.example
+
+# QGIS project backups
+*.qgs~
+*.qgz~
+*.qgs.bak
+*.qgz.bak
+
+# System files
+Thumbs.db
+Desktop.ini
+.DS_Store
