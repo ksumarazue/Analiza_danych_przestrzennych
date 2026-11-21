@@ -1,149 +1,73 @@
-# Analiza danych przestrzennych – czujniki PM2.5 na terenie Opola
+# Analiza danych przestrzennych – Pandas, GeoPandas i Rasterio
 
 ## 1. Cel ćwiczenia
 
-Celem ćwiczenia było zapoznanie się z podstawowymi możliwościami bibliotek **Pandas** i **GeoPandas** w zakresie przetwarzania, analizy oraz wizualizacji danych przestrzennych.
+Celem ćwiczenia było zapoznanie się z możliwościami bibliotek **Pandas, GeoPandas i Rasterio** w zakresie przetwarzania, analizy i wizualizacji danych przestrzennych.
 
-W ramach laboratorium przeprowadzono analizę danych dotyczących czujników jakości powietrza PM2.5, lokalizacji szkół oraz granic administracyjnych dzielnic Opola.
+Przeprowadzono analizę lokalizacji czujników PM2.5, szkół i dzielnic Opola oraz zobrazowań satelitarnych Sentinel-2. Na podstawie danych rastrowych obliczono wskaźnik NDVI, umożliwiający ocenę występowania roślinności.
 
-Ćwiczenie wykonano w środowisku **Google Colab**, wykorzystując język Python. Końcowym rezultatem było przygotowanie oczyszczonego zbioru danych oraz interaktywnej mapy przedstawiającej analizowane obiekty.
+Ćwiczenie wykonano w języku Python, wykorzystując środowisko PyCharm oraz bibliotekę Streamlit do stworzenia interaktywnej aplikacji internetowej.
 
 ## 2. Wykorzystane narzędzia i dane
 
 ### Narzędzia
 
-- **Google Colab** – środowisko umożliwiające uruchamianie kodu Python w przeglądarce.
-- **Python** – język programowania wykorzystany do przetwarzania danych.
-- **Pandas** – biblioteka służąca do analizy i czyszczenia danych tabelarycznych.
-- **GeoPandas** – biblioteka umożliwiająca przetwarzanie danych przestrzennych.
-- **Folium** – biblioteka wykorzystywana do tworzenia interaktywnych map.
-- **GitHub** – repozytorium przechowujące notatnik oraz dokumentację.
+- **PyCharm i Python** – środowisko programowania i przetwarzania danych.
+- **Streamlit** – interfejs aplikacji internetowej.
+- **Pandas** – analiza i czyszczenie danych tabelarycznych.
+- **GeoPandas** – operacje na danych przestrzennych.
+- **Rasterio i NumPy** – przetwarzanie danych rastrowych i obliczanie NDVI.
+- **Folium i Matplotlib** – wizualizacja map i wykresów.
 
 ### Dane wejściowe
 
-W ćwiczeniu wykorzystano trzy pliki:
+| Plik | Opis |
+|---|---|
+| `pm25_sensors.csv` | Lokalizacje i pomiary czujników PM2.5 |
+| `opole_districts.geojson` | Granice dzielnic Opola |
+| `opole_schools.geojson` | Lokalizacje szkół |
+| `B04.tiff` | Pasmo czerwone Sentinel-2 |
+| `B08.tiff` | Pasmo bliskiej podczerwieni Sentinel-2 |
+| `NDVI.tiff` | Wskaźnik NDVI z Copernicus Browser |
+| `True_color.tiff` | Zobrazowanie w kolorach naturalnych |
 
-| Plik | Format | Opis |
-|---|---|---|
-| `pm25_sensors.csv` | CSV | Dane czujników jakości powietrza, współrzędne geograficzne i wartości PM2.5 |
-| `opole_districts.geojson` | GeoJSON | Granice administracyjne dzielnic Opola |
-| `opole_schools.geojson` | GeoJSON | Lokalizacje szkół na terenie Opola |
+Dane Sentinel-2 L2A pochodziły z 6 października 2026 r. i obejmowały Opole oraz okolice.
 
 ## 3. Przebieg ćwiczenia
 
-### Krok 1. Przygotowanie środowiska
+### 3.1. Przygotowanie aplikacji
 
-Utworzono notatnik w środowisku Google Colab, a następnie zaimportowano biblioteki niezbędne do przeprowadzenia analizy.
+Utworzono projekt Python ze środowiskiem wirtualnym. Aplikację Streamlit podzielono na dwie strony:
 
-```python
-import pandas as pd
-import geopandas as gpd
-import folium
-from IPython.display import display
-```
+- `page1.py` – analiza danych Pandas i GeoPandas.
+- `page2.py` – przetwarzanie danych rastrowych Rasterio.
 
-### Krok 2. Wczytanie danych
+Dane wczytywano automatycznie z lokalnego katalogu `data/`.
 
-Plik CSV zawierający dane czujników został wczytany przy użyciu biblioteki Pandas.
+### 3.2. Analiza i czyszczenie danych PM2.5
 
-Pozostałe pliki, zawierające dane przestrzenne w formacie GeoJSON, zostały wczytane za pomocą GeoPandas.
+Dane czujników wczytano za pomocą Pandas. Sprawdzono typy danych, statystyki opisowe, brakujące wartości i duplikaty.
 
-```python
-df = pd.read_csv("/content/data/pm25_sensors.csv")
-
-districts = gpd.read_file("/content/data/opole_districts.geojson")
-schools = gpd.read_file("/content/data/opole_schools.geojson")
-```
-
-Do wyświetlenia pierwszych rekordów wykorzystano metodę `head()`.
-
-```python
-display(df.head(10))
-```
-
-### Krok 3. Wstępna analiza danych
-
-Przeprowadzono podstawową analizę zbioru danych obejmującą:
-
-- sprawdzenie liczby rekordów,
-- identyfikację typów danych,
-- wyznaczenie podstawowych statystyk,
-- wykrycie brakujących wartości,
-- sprawdzenie występowania duplikatów.
-
-Wykorzystano następujące instrukcje:
-
-```python
-print("Liczba rekordów:", len(df))
-
-df.info()
-display(df.describe())
-
-print(df.isna().sum())
-print(df.duplicated().sum())
-```
-
-Analiza pozwoliła zidentyfikować rekordy wymagające oczyszczenia przed dalszym przetwarzaniem.
-
-### Krok 4. Czyszczenie danych
-
-Proces czyszczenia obejmował usunięcie duplikatów, konwersję typów danych, obsługę brakujących wartości oraz korektę błędnych współrzędnych geograficznych.
-
-**Usunięcie duplikatów:**
+Następnie usunięto nieprawidłowe rekordy oraz poprawiono zamienione współrzędne geograficzne.
 
 ```python
 df = df.drop_duplicates().copy()
-```
-
-**Konwersja danych na wartości liczbowe:**
-
-```python
-for col in ["lat", "lon", "pm25"]:
-    df[col] = pd.to_numeric(df[col], errors="coerce")
-```
-
-Nieprawidłowe wartości tekstowe zostały zamienione na `NaN`.
-
-**Usunięcie rekordów z brakującymi wartościami:**
-
-```python
 df = df.dropna(subset=["lat", "lon", "pm25"])
-```
 
-Usunięto rekordy bez wymaganych współrzędnych geograficznych lub wartości PM2.5.
-
-**Wykrycie i poprawienie zamienionych współrzędnych:**
-
-```python
 swapped = df["lat"].between(14, 24.5) & df["lon"].between(49, 55)
 
-print("Przed zmianą:")
-display(df.loc[swapped, ["lat", "lon"]])
+df.loc[swapped, ["lat", "lon"]] = (
+    df.loc[swapped, ["lon", "lat"]].to_numpy()
+)
 
-df.loc[swapped, ["lat", "lon"]] = df.loc[swapped, ["lon", "lat"]].to_numpy()
-
-print("Po zmianie:")
-display(df.loc[swapped, ["lat", "lon"]])
-```
-
-Zastosowano orientacyjne zakresy szerokości i długości geograficznej Polski. Wykryte błędne współrzędne zostały zamienione miejscami.
-
-**Usunięcie nieprawidłowych pomiarów i lokalizacji:**
-
-```python
 df = df[df["pm25"] >= 0]
-
-df = df[
-    df["lat"].between(49, 55) &
-    df["lon"].between(14, 24.5)
-]
 ```
 
-Odrzucono rekordy zawierające ujemne wartości PM2.5 oraz współrzędne znajdujące się poza przyjętym zakresem.
+Po czyszczeniu pozostało **130 ze 145 rekordów**. Skorygowano również trzy pary współrzędnych.
 
-### Krok 5. Przygotowanie danych przestrzennych
+### 3.3. Operacje przestrzenne GeoPandas
 
-Po zakończeniu czyszczenia utworzono obiekt `GeoDataFrame`, umożliwiający przetwarzanie danych czujników jako punktów przestrzennych.
+Oczyszczone dane przekształcono do obiektu `GeoDataFrame`, tworząc geometrie punktowe na podstawie współrzędnych.
 
 ```python
 sensors = gpd.GeoDataFrame(
@@ -153,67 +77,103 @@ sensors = gpd.GeoDataFrame(
 )
 ```
 
-Wykorzystano układ współrzędnych **EPSG:4326 (WGS 84)**, stosowany do reprezentowania lokalizacji geograficznych za pomocą szerokości i długości geograficznej.
+Następnie wykonano transformację do układu EPSG:2180, umożliwiającego obliczenia w metrach.
 
-Każdemu rekordowi przypisano geometrię typu `Point` na podstawie jego współrzędnych.
+W ramach analizy:
 
-### Krok 6. Wizualizacja na interaktywnej mapie
+- obliczono powierzchnie dzielnic Opola,
+- przypisano czujniki do dzielnic za pomocą `sjoin()`,
+- wyznaczono średnie PM2.5 dla poszczególnych dzielnic,
+- utworzono strefy buforowe wokół szkół,
+- obliczono pokrycie miasta strefami buforowymi.
 
-Do przygotowania interaktywnej mapy wykorzystano bibliotekę Folium oraz metodę `explore()` z GeoPandas.
+Wyniki przedstawiono na interaktywnych mapach z podkładem satelitarnym.
 
-Na mapie przedstawiono trzy warstwy:
+![Mapa średniego stężenia PM2.5 w dzielnicach Opola](images/mapa_pm25_opole.png)
 
-- granice administracyjne dzielnic Opola,
-- lokalizacje czujników PM2.5,
-- lokalizacje szkół.
+*Rys. 1. Mapa średniego stężenia PM2.5 w dzielnicach Opola.*
 
-Czujniki zostały oznaczone kolorami odpowiadającymi wartościom PM2.5.
+![Strefy buforowe dla szkół](images/strefy_buforowe.png)
 
-Dzięki zastosowaniu interaktywnej mapy możliwe było przybliżanie widoku, wybieranie poszczególnych punktów oraz wyświetlanie informacji o obiektach.
+*Rys. 2. Strefy buforowe wokół szkół z zaznaczonymi czujnikami PM2.5.*
 
-Dodano również mechanizm `LayerControl`, pozwalający na włączanie i wyłączanie poszczególnych warstw.
+Dodatkowo przygotowano eksport wyników do formatów GeoPackage, GeoJSON i CSV.
 
-### Krok 7. Wyświetlenie tabeli danych
+### 3.4. Analiza danych rastrowych
 
-Ostatnim elementem ćwiczenia było wyświetlenie tabeli zawierającej oczyszczone dane czujników.
+W drugiej części ćwiczenia wykorzystano pasma B04 (Red) i B08 (NIR) satelity Sentinel-2.
+
+Za pomocą Rasterio odczytano metadane rastrów, w tym rozdzielczość, CRS, transformację afiniczną oraz wartości pikseli.
+
+Przeanalizowano podstawowe statystyki obu pasm i przedstawiono ich rozkłady na histogramach.
+
+Następnie rastry przeliczono z EPSG:4326 do układu **EPSG:2180**, tworząc wspólną siatkę pikseli o rozdzielczości 10 × 10 metrów.
+
+### 3.5. Obliczenie i klasyfikacja NDVI
+
+Na podstawie pasm B04 i B08 obliczono wskaźnik NDVI:
+
+\[
+NDVI = \frac{NIR-Red}{NIR+Red}
+\]
 
 ```python
-display(sensors.drop(columns="geometry"))
+with np.errstate(divide="ignore", invalid="ignore"):
+    ndvi = (nir_m - red_m) / (nir_m + red_m)
+
+ndvi = np.ma.masked_invalid(ndvi)
 ```
 
-Usunięcie kolumny `geometry` z prezentowanej tabeli pozwoliło na czytelniejsze wyświetlenie podstawowych atrybutów punktów, takich jak współrzędne i wartości PM2.5.
+Wyniki przedstawiono w formie mapy oraz histogramu.
 
-Operacja ta nie zmieniła oryginalnego obiektu `sensors`.
+Następnie wartości NDVI podzielono na cztery klasy: wodę i powierzchnie o niskim NDVI, glebę i zabudowę, rzadką oraz gęstą roślinność.
+
+Zastosowano interaktywne suwaki umożliwiające zmianę progów klasyfikacji. Dla każdej klasy obliczono liczbę pikseli i powierzchnię w hektarach.
+
+![Klasy NDVI](images/ndvi.png)
+
+*Rys. 3. Mapa NDVI obliczona na podstawie pasm Sentinel-2.*
+
+![Klasy NDVI](images/klasy_ndvi.png)
+
+*Rys. 4. Klasyfikacja NDVI z zestawieniem powierzchni poszczególnych klas.*
+
+### 3.6. Statystyki strefowe NDVI
+
+Ostatnim etapem było połączenie rastra NDVI z granicami dzielnic Opola.
+
+Za pomocą `rasterio.mask.mask()` wyodrębniono piksele znajdujące się w granicach poszczególnych poligonów.
+
+Dla każdej dzielnicy obliczono średnią, minimalną i maksymalną wartość NDVI oraz procent pokrycia obszaru poprawnymi pikselami.
+
+Dla dzielnic o pokryciu poniżej 50% pominięto statystyki NDVI, ponieważ mogłyby być niereprezentatywne.
+
+Wyniki przedstawiono na mapie, na której poligony pokolorowano według średniego NDVI, a obszary o niewystarczającym pokryciu oznaczono kreskowaniem.
+
+![Klasy NDVI](images/ndvi_poligony.png)
+
+*Rys. 5. Średnie wartości NDVI dla dzielnic Opola wraz z oznaczeniem obszarów o niewystarczającym pokryciu.*
 
 ## 4. Rezultaty
 
-W wyniku przeprowadzonych operacji:
+W wyniku ćwiczenia:
 
-- Wczytano i przeanalizowano trzy zbiory danych.
-- Zidentyfikowano błędne i brakujące wartości.
-- Usunięto powtarzające się rekordy.
-- Skorygowano zamienione współrzędne geograficzne.
-- Odrzucono rekordy z nieprawidłowymi pomiarami PM2.5.
-- Utworzono obiekt `GeoDataFrame` reprezentujący lokalizacje czujników.
-- Przygotowano interaktywną mapę z trzema warstwami danych.
-- Wyświetlono tabelę z oczyszczonymi danymi.
-
-### Wyniki czyszczenia danych
-
-| Parametr | Wartość |
-|---|---:|
-| Początkowa liczba rekordów czujników | 145 |
-| Liczba rekordów po czyszczeniu | 130 |
-| Liczba usuniętych rekordów | 15 |
-| Liczba skorygowanych par współrzędnych | 3 |
-| Udział zachowanych rekordów | 89,7% |
+- Oczyszczono dane czujników PM2.5, pozostawiając 130 poprawnych rekordów.
+- Wykonano analizy przestrzenne punktów i poligonów z wykorzystaniem GeoPandas.
+- Obliczono powierzchnie dzielnic, średnie wartości PM2.5 oraz strefy buforowe.
+- Przeprowadzono reprojekcję danych rastrowych do układu metrycznego.
+- Obliczono i sklasyfikowano wskaźnik NDVI na podstawie danych Sentinel-2.
+- Wyznaczono statystyki NDVI dla dzielnic Opola.
+- Przygotowano interaktywne mapy, wykresy i tabele wynikowe w aplikacji Streamlit.
 
 ## 5. Wnioski
 
-W ramach ćwiczenia zapoznano się z praktycznym wykorzystaniem bibliotek Pandas i GeoPandas do analizy danych tabelarycznych i przestrzennych.
+Ćwiczenie pozwoliło poznać podstawowe metody przetwarzania danych tabelarycznych, wektorowych i rastrowych w języku Python.
 
-Pandas umożliwił wykonanie podstawowych operacji związanych z przeglądaniem, filtrowaniem i czyszczeniem danych. GeoPandas pozwolił na utworzenie obiektów przestrzennych na podstawie współrzędnych geograficznych.
+Wykorzystanie Pandas i GeoPandas umożliwiło oczyszczenie danych oraz przeprowadzenie analiz przestrzennych związanych z jakością powietrza. Biblioteka Rasterio pozwoliła na przetworzenie zobrazowań Sentinel-2 i obliczenie wskaźnika NDVI.
 
-Zastosowanie interaktywnej mapy umożliwiło przedstawienie lokalizacji czujników PM2.5, szkół oraz granic dzielnic na wspólnej wizualizacji.
+Istotnym elementem było prawidłowe przygotowanie danych, szczególnie uwzględnienie układów współrzędnych, brakujących wartości oraz zgodności siatek rastrowych.
 
-Ćwiczenie pokazało również znaczenie weryfikacji jakości danych przed ich wizualizacją. Nieprawidłowe współrzędne lub błędne pomiary mogłyby prowadzić do niepoprawnego rozmieszczenia punktów na mapie i błędnej interpretacji wyników.
+Zastosowanie Streamlit umożliwiło przygotowanie interaktywnej aplikacji, w której zmiana parametrów analizy wpływa bezpośrednio na prezentowane wyniki.
+
+Ćwiczenie pokazało możliwości łączenia analiz wektorowych i rastrowych w celu badania zjawisk przestrzennych i środowiskowych.
